@@ -1,0 +1,385 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Resistor Color Calculator</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f0f4f8;
+  color: #172033;
+}
+
+header {
+  background: #145c49;
+  color: white;
+  text-align: center;
+  padding: 28px 15px;
+}
+
+header h1 {
+  margin: 0 0 10px;
+}
+
+header p {
+  margin: 0;
+  color: #d8f5e9;
+}
+
+main {
+  max-width: 950px;
+  margin: 25px auto;
+  padding: 0 15px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.card {
+  background: white;
+  padding: 24px;
+  border-radius: 16px;
+  box-shadow: 0 5px 20px #0000000d;
+}
+
+h2 {
+  margin-top: 0;
+}
+
+label {
+  display: block;
+  font-weight: bold;
+  margin: 15px 0 7px;
+}
+
+select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: white;
+  font-size: 16px;
+}
+
+button {
+  padding: 11px 18px;
+  border: 0;
+  border-radius: 8px;
+  background: #dce7e3;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+button.active {
+  background: #145c49;
+  color: white;
+}
+
+#resistor {
+  width: 100%;
+  margin: 25px 0;
+}
+
+.result {
+  background: #e5f6ed;
+  border: 1px solid #b8e5cc;
+  padding: 22px;
+  border-radius: 12px;
+}
+
+#value {
+  font-size: clamp(30px, 5vw, 42px);
+  font-weight: bold;
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+  color: #145c49;
+}
+
+#steps {
+  line-height: 1.8;
+  margin-top: 18px;
+}
+
+.note {
+  background: #f1f5f9;
+  padding: 13px;
+  border-radius: 8px;
+  margin-top: 20px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+@media (max-width: 650px) {
+  main {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>⚡ Resistor Color Calculator</h1>
+  <p>Discover resistor values using color bands</p>
+</header>
+
+<main>
+  <section class="card">
+    <h2>Choose Color Bands</h2>
+    <p>Select the colors printed on your resistor.</p>
+
+    <button class="active" id="four" onclick="setBands(4)">
+      4 Bands
+    </button>
+    <button id="five" onclick="setBands(5)">
+      5 Bands
+    </button>
+
+    <svg id="resistor" viewBox="0 0 400 100"
+         role="img" aria-label="Resistor color band illustration">
+      <defs>
+        <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#f4d9a8"/>
+          <stop offset="50%" stop-color="#dfbd82"/>
+          <stop offset="100%" stop-color="#c99b60"/>
+        </linearGradient>
+      </defs>
+
+      <line x1="5" y1="50" x2="105" y2="50"
+            stroke="#9299a3" stroke-width="5"/>
+      <line x1="295" y1="50" x2="395" y2="50"
+            stroke="#9299a3" stroke-width="5"/>
+
+      <rect x="90" y="20" width="220" height="60"
+            rx="22" fill="url(#body)" stroke="#b98d54"/>
+
+      <g id="bands"></g>
+    </svg>
+
+    <div id="controls"></div>
+
+    <div class="note">
+      Tip: Start reading from the side opposite the tolerance
+      band, which is often gold or silver.
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Your Resistance</h2>
+
+    <div class="result">
+      <div>Calculated resistance</div>
+      <div id="value">270 Ω</div>
+      <div id="ohms"></div>
+      <p id="tolerance"></p>
+    </div>
+
+    <div id="steps"></div>
+
+    <div class="note">
+      <b>Remember:</b><br>
+      1 kΩ = 1,000 Ω<br>
+      1 MΩ = 1,000,000 Ω<br>
+      1.5 MΩ = 1,500 kΩ, not 10 kΩ.
+    </div>
+  </section>
+</main>
+
+<script>
+const colors = [
+  {name:"Black", hex:"#222222", digit:0, mult:1},
+  {name:"Brown", hex:"#8b4513", digit:1, mult:10},
+  {name:"Red", hex:"#e53935", digit:2, mult:100},
+  {name:"Orange", hex:"#f57c00", digit:3, mult:1000},
+  {name:"Yellow", hex:"#fdd835", digit:4, mult:10000},
+  {name:"Green", hex:"#2e9d50", digit:5, mult:100000},
+  {name:"Blue", hex:"#2878d0", digit:6, mult:1000000},
+  {name:"Violet", hex:"#8e44ad", digit:7, mult:10000000},
+  {name:"Grey", hex:"#9299a3", digit:8, mult:100000000},
+  {name:"White", hex:"#f5f5f5", digit:9, mult:1000000000},
+  {name:"Gold", hex:"#c7a13b", mult:0.1},
+  {name:"Silver", hex:"#b9c0ca", mult:0.01}
+];
+
+const tolerances = [
+  {name:"Brown", value:1},
+  {name:"Red", value:2},
+  {name:"Green", value:0.5},
+  {name:"Blue", value:0.25},
+  {name:"Violet", value:0.1},
+  {name:"Grey", value:0.05},
+  {name:"Gold", value:5},
+  {name:"Silver", value:10}
+];
+
+let bandCount = 4;
+let selected = ["Red", "Violet", "Brown", "Gold", "Brown"];
+
+const $ = id => document.getElementById(id);
+
+function setBands(n) {
+  bandCount = n;
+
+  selected = n === 4
+    ? ["Red", "Violet", "Brown", "Gold", "Brown"]
+    : ["Brown", "Black", "Black", "Red", "Brown"];
+
+  $("four").classList.toggle("active", n === 4);
+  $("five").classList.toggle("active", n === 5);
+
+  buildControls();
+  calculate();
+}
+
+function buildControls() {
+  const definitions = bandCount === 4
+    ? [
+        ["First digit", "digit"],
+        ["Second digit", "digit"],
+        ["Multiplier", "mult"],
+        ["Tolerance", "tol"]
+      ]
+    : [
+        ["First digit", "digit"],
+        ["Second digit", "digit"],
+        ["Third digit", "digit"],
+        ["Multiplier", "mult"],
+        ["Tolerance", "tol"]
+      ];
+
+  $("controls").innerHTML = definitions.map((item, i) => {
+    let available;
+
+    if (item[1] === "tol") {
+      available = tolerances.map(c => c.name);
+    } else if (item[1] === "mult") {
+      available = colors.filter(c => c.mult !== undefined)
+                        .map(c => c.name);
+    } else {
+      available = colors.filter(c => c.digit !== undefined)
+                        .map(c => c.name);
+    }
+
+    return `
+      <label for="band${i}">${item[0]}</label>
+      <select id="band${i}">
+        ${available.map(name => `
+          <option value="${name}"
+            ${selected[i] === name ? "selected" : ""}>
+            ${name}
+          </option>
+        `).join("")}
+      </select>
+    `;
+  }).join("");
+
+  for (let i = 0; i < bandCount; i++) {
+    $("band" + i).addEventListener("change", e => {
+      selected[i] = e.target.value;
+      calculate();
+    });
+  }
+}
+
+function formatResistance(value) {
+  if (value >= 1000000) {
+    return Number((value / 1000000).toPrecision(5)) + " MΩ";
+  }
+
+  if (value >= 1000) {
+    return Number((value / 1000).toPrecision(5)) + " kΩ";
+  }
+
+  return Number(value.toPrecision(5)) + " Ω";
+}
+
+function calculate() {
+  for (let i = 0; i < bandCount; i++) {
+    selected[i] = $("band" + i).value;
+  }
+
+  const digitCount = bandCount === 4 ? 2 : 3;
+
+  const digits = selected.slice(0, digitCount).map(name =>
+    colors.find(c => c.name === name).digit
+  );
+
+  const significant = Number(digits.join(""));
+
+  const multiplier = colors.find(c =>
+    c.name === selected[digitCount]
+  ).mult;
+
+  const resistance = significant * multiplier;
+
+  const tolerance = tolerances.find(c =>
+    c.name === selected[bandCount - 1]
+  );
+
+  $("value").textContent = formatResistance(resistance);
+  $("ohms").textContent =
+    resistance.toLocaleString("en-US") + " ohms";
+
+  $("tolerance").textContent =
+    tolerance.name + " tolerance: ±" + tolerance.value + "%";
+
+  drawResistor();
+  showSteps(digits, significant, multiplier, resistance, tolerance);
+}
+
+function drawResistor() {
+  const group = $("bands");
+  group.innerHTML = "";
+
+  const positions = bandCount === 4
+    ? [130, 180, 235, 280]
+    : [120, 158, 196, 245, 280];
+
+  for (let i = 0; i < bandCount; i++) {
+    const color = colors.find(c => c.name === selected[i]);
+
+    const rect = document.createElementNS(
+      "http://www.w3.org/2000/svg", "rect"
+    );
+
+    rect.setAttribute("x", positions[i]);
+    rect.setAttribute("y", 19);
+    rect.setAttribute("width", i === bandCount - 1 ? 10 : 15);
+    rect.setAttribute("height", 62);
+    rect.setAttribute("rx", 2);
+    rect.setAttribute("fill", color.hex);
+    rect.setAttribute("stroke", "#00000030");
+
+    group.appendChild(rect);
+  }
+}
+
+function showSteps(digits, significant, multiplier, resistance, tolerance) {
+  const descriptions = digits.map((digit, i) =>
+    `<p><b>Band ${i + 1}:</b> ${selected[i]} = ${digit}</p>`
+  );
+
+  descriptions.push(`
+    <p><b>Multiplier:</b> ${selected[digits.length]} = ×${multiplier}</p>
+    <p><b>Calculation:</b> ${significant} × ${multiplier}
+       = ${resistance.toLocaleString("en-US")} Ω</p>
+    <p><b>Tolerance:</b> ${tolerance.name} = ±${tolerance.value}%</p>
+  `);
+
+  $("steps").innerHTML = descriptions.join("");
+}
+
+setBands(4);
+</script>
+
+</body>
+</html>
